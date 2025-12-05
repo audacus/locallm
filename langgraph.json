@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "./"
+  ],
+  "graphs": {
+    "locallm": "./graph.py:graph"
+  },
+  "env": "./.env"
+}

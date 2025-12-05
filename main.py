@@ -1,23 +1,32 @@
-from mlx_lm import load, generate
+import asyncio
+import uuid
 
-model, tokenizer = load("mlx-community/Orchestrator-8B-4bit")
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
+
+from graph import graph
 
 
-def do_stuff(prompt: str) -> str:
-    if tokenizer.chat_template is not None:
-        messages = [{"role": "user", "content": prompt}]
-        prompt = tokenizer.apply_chat_template(
-            conversation=messages,
-            add_generation_prompt=True,
-        )
+async def main():
+    compiled = graph.compile()
+    config: RunnableConfig = {
+        # Ensure every run has a separate thread ID.
+        "configurable": {"thread_id": str(uuid.uuid4())},
+    }
 
-    return generate(
-        model=model,
-        tokenizer=tokenizer,
-        prompt=prompt,
-        verbose=True,
-    )
+    # Write graph diagram to file.
+    image_bytes = compiled.get_graph().draw_mermaid_png()
+    with open("graph.png", "wb") as f:
+        f.write(image_bytes)
+
+    messages = [
+        HumanMessage(
+            content="What happens when an unstoppable force meets an immovable object?",
+        ),
+    ]
+    compiled.invoke(input=Command(update={"messages": messages}), config=config)
 
 
 if __name__ == "__main__":
-    do_stuff("Hello, world!")
+    asyncio.run(main())
