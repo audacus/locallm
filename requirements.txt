@@ -1,2 +1,6 @@
 black
-mlx-lm
+langchain
+langchain-community
+langgraph-cli[inmem]
+mlx-lm==0.27.1 # 0.27.1 allows passing `formatter` to `generate()` and supports models of type `qwen3`.
+torch
