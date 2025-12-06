@@ -3,7 +3,10 @@
     "./"
   ],
   "graphs": {
-    "locallm": "./graph.py:graph"
+    "locallm": {
+      "path": "./graph/orchestrator.py:orchestrator_graph",
+      "description": "Multimodal all-rounder agent:\n- Convert text to speech and return the path to the audio file.\n- Play audio file at given path."
+    }
   },
   "env": "./.env"
 }

@@ -2,4 +2,6 @@
 .env
 .idea/
 .langgraph_api/
+.venv
 __pycache__/
+generated_audio/

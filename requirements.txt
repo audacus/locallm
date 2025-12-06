@@ -1,6 +1,10 @@
 black
 langchain
-langchain-community
+langchain-mcp-adapters
+langchain[openai]
 langgraph-cli[inmem]
-mlx-lm==0.27.1 # 0.27.1 allows passing `formatter` to `generate()` and supports models of type `qwen3`.
+mlx-audio
+mlx-lm
+mlx-whisper
+simpleaudio
 torch
