@@ -7,4 +7,6 @@ mlx-audio
 mlx-lm
 mlx-whisper
 simpleaudio
+sounddevice
+soundfile
 torch

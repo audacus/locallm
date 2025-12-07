@@ -5,7 +5,7 @@
   "graphs": {
     "locallm": {
       "path": "./graph/orchestrator.py:orchestrator_graph",
-      "description": "Multimodal all-rounder agent:\n- Convert text to speech and return the path to the audio file.\n- Play audio file at given path."
+      "description": "Multimodal all-rounder agent:\n- Plays multiple audio files. Requires their file paths.\n- Converts multiple texts to speech and returns the paths to the generated audio files."
     }
   },
   "env": "./.env"

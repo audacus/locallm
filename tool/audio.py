@@ -1,31 +1,63 @@
+import os
+
+import sounddevice
+import soundfile
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
-from simpleaudio import WaveObject
 
 
 # Other libraries: https://realpython.com/playing-and-recording-sound-python/#playing-audio-files
 @tool(
     "play_audio",
-    description="Play audio file at given path.",
+    description="Plays multiple audio files. Requires their file paths.",
 )
 def play_audio(
-    file_path: str,
+    file_paths: list[str],
     runtime: ToolRuntime[None, MessagesState],
 ) -> Command:
-    wave_obj = WaveObject.from_wave_file(file_path)
-    play_obj = wave_obj.play()
-    print(play_obj)
+    if len(file_paths) == 0:
+        tool_message = ToolMessage(
+            status="error",
+            content="No file paths given!",
+            tool_call_id=runtime.tool_call_id,
+        )
+
+        return Command(update={"messages": [tool_message]})
+
+    good_paths: list[str] = []
+    bad_paths: list[str] = []
+    for file_path in file_paths:
+        if not os.path.isfile(file_path):
+            bad_paths.append(file_path)
+        else:
+            good_paths.append(file_path)
+
+            data, samplerate = soundfile.read(file_path)
+            sounddevice.play(data, samplerate)
+            sounddevice.wait()
+
+    message_lines: list[str] = []
+    if len(good_paths) > 0:
+        message_lines.append("Playing audio files:")
+        for good_path in good_paths:
+            message_lines.append(f"  - {good_path}")
+
+    if len(bad_paths) > 0:
+        message_lines.append("Invalid file paths:")
+        for bad_path in bad_paths:
+            message_lines.append(f"  - {bad_path}")
+
+    if not good_paths and not bad_paths:
+        message_lines.append("No audio files playing.")
 
     tool_message = ToolMessage(
-        content=f"Playing audio file: {file_path}",
+        content="\n".join(message_lines),
         tool_call_id=runtime.tool_call_id,
     )
 
-    return Command(
-        update={
-            "messages": [tool_message],
-        }
-    )
+    tool_message.pretty_print()
+
+    return Command(update={"messages": [tool_message]})
