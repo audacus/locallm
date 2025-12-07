@@ -1,4 +1,4 @@
-!.env.example
+.DS_Store
 .env
 .idea/
 .langgraph_api/

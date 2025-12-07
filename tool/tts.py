@@ -8,33 +8,35 @@ from graph.tts import TTSState, TTSOutputState, tts_compiled
 
 @tool(
     "text_to_speech",
-    description="Convert text to speech and return the path to the audio file.",
+    description="Converts multiple texts to speech and returns the paths to the generated audio files.",
 )
 def call_tts(
-    text: str,
+    texts: list[str],
     runtime: ToolRuntime[None, TTSState],
 ) -> Command:
+    if len(texts) == 0:
+        tool_message = ToolMessage(
+            status="error",
+            content="No texts given!",
+            tool_call_id=runtime.tool_call_id,
+        )
+
+        return Command(update={"messages": [tool_message]})
+
     result: TTSOutputState = tts_compiled.invoke(
         input={
-            "messages": [HumanMessage(content=text)],
+            "messages": [HumanMessage(content=texts)],
         },
     )
 
     message = result["messages"][-1].content
-    file_path = result["file_path"]
-    cached = result["cached"]
-    generation = result["generation"]
 
     tool_message = ToolMessage(
         content=message,
         tool_call_id=runtime.tool_call_id,
-        file_path=file_path,
-        cached=cached,
-        generation=generation,
+        artifact=result["generations"],
     )
 
     tool_message.pretty_print()
 
-    return Command(
-        update={"messages": [tool_message]},
-    )
+    return Command(update={"messages": [tool_message]})

@@ -2,7 +2,6 @@ import asyncio
 import uuid
 
 from langchain_core.messages import HumanMessage
-from langchain_core.messages.content import create_text_block, create_image_block
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
@@ -27,10 +26,9 @@ async def main():
     # Simulate user input
     messages = [
         HumanMessage(
-            content_blocks=[
-                create_text_block(text="Convert following text to speech and play it: Hi there."),
-                # create_image_block(url="graph.png"),
-            ],
+            content="""Play following texts as audio:
+- Hello there!
+- How are you?"""
         ),
     ]
 
@@ -41,7 +39,7 @@ async def main():
         input=Command(update={"messages": messages}),
         config=config,
         context=context,
-        subgraphs=True
+        subgraphs=True,
     )
 
 
