@@ -8,6 +8,9 @@ Rules:
 - Use real values only. Never make up file paths or results.
 - Call multiple tools at once when they do not depend on each other.
 - Wait for results only when the next tool needs them.
+- Ask questions to the user, when unclear or uncertain about the request.
+
+Tool usage examples:
 
 Example 1 - Multiple items (parallel):
 User: Do X for item1 and item2
