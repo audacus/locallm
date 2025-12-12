@@ -1,4 +1,6 @@
 black
+fastapi[standard]
+fastmcp
 langchain
 langchain-mcp-adapters
 langchain[openai]
@@ -6,6 +8,8 @@ langgraph-cli[inmem]
 mlx-audio
 mlx-lm
 mlx-whisper
+pydantic
+python-vlc
 simpleaudio
 sounddevice
 soundfile

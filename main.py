@@ -7,8 +7,6 @@ from langgraph.types import Command
 
 from graph.orchestrator import orchestrator_compiled
 
-# from runnable.tts import tts_compiled
-
 GRAPH = orchestrator_compiled
 
 
@@ -26,19 +24,19 @@ async def main():
     # Simulate user input
     messages = [
         HumanMessage(
-            content="""Play following texts as audio:
-- Hello there!
-- How are you?"""
+            content=""""
+Convert following conversation to audio:
+- Hey there!
+- Hi!
+- How are you?
+- I'm fine thanks.
+"""
         ),
     ]
 
-    context = {
-        "voice": "af_heart",
-    }
-    GRAPH.invoke(
+    await GRAPH.ainvoke(
         input=Command(update={"messages": messages}),
         config=config,
-        context=context,
         subgraphs=True,
     )
 
