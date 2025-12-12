@@ -7,25 +7,33 @@ from langchain_core.tools import tool
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
+from pydantic import BaseModel, Field
+
+
+class AudioInput(BaseModel):
+    file_paths: list[str] = Field(description="Paths to audio files.")
 
 
 # Other libraries: https://realpython.com/playing-and-recording-sound-python/#playing-audio-files
 @tool(
     "play_audio",
-    description="Plays multiple audio files. Requires their file paths.",
+    description="Plays a list of audio files.",
+    args_schema=AudioInput,
 )
 def play_audio(
     file_paths: list[str],
     runtime: ToolRuntime[None, MessagesState],
 ) -> Command:
     if len(file_paths) == 0:
-        tool_message = ToolMessage(
+        tool_error_message = ToolMessage(
             status="error",
             content="No file paths given!",
             tool_call_id=runtime.tool_call_id,
         )
 
-        return Command(update={"messages": [tool_message]})
+        tool_error_message.pretty_print()
+
+        return Command(update={"messages": [tool_error_message]})
 
     good_paths: list[str] = []
     bad_paths: list[str] = []
@@ -53,11 +61,11 @@ def play_audio(
     if not good_paths and not bad_paths:
         message_lines.append("No audio files playing.")
 
-    tool_message = ToolMessage(
+    tool_error_message = ToolMessage(
         content="\n".join(message_lines),
         tool_call_id=runtime.tool_call_id,
     )
 
-    tool_message.pretty_print()
+    tool_error_message.pretty_print()
 
-    return Command(update={"messages": [tool_message]})
+    return Command(update={"messages": [tool_error_message]})
