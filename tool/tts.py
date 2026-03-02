@@ -15,6 +15,8 @@ from langgraph.types import Command
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from store.references import get_reference_key
+
 load_dotenv()
 
 openai_client = OpenAI(
@@ -45,6 +47,15 @@ class TTSGeneration(BaseModel):
     voice: str
 
 
+class TTSGenerationArtifact(BaseModel):
+    base64_data: str
+    cached: bool
+    file_path_ref: str
+    input: str
+    model: str
+    voice: str
+
+
 def convert_text_to_speech(
     voice_text_parts: list[VoiceTextPart],
 ) -> list[TTSGeneration]:
@@ -69,6 +80,11 @@ def convert_text_to_speech(
             for file_name in os.listdir(generated_audio_dir):
                 if fnmatch.fnmatch(file_name, f"*{generation_hash}.wav"):
                     file_path = generated_audio_dir.joinpath(file_name)
+                    print(
+                        "Using cached file:",
+                        voice_text_part.voice,
+                        f'"{voice_text_part.text}"',
+                    )
                     use_cached_file = True
 
         if not use_cached_file:
@@ -101,7 +117,7 @@ def convert_text_to_speech(
 
 @tool(
     "convert_texts_to_speech_audio_files",
-    description="Converts a list of voice/text parts to speech and returns the paths to the generated audio files.",
+    description="Converts a list of voice/text parts to speech and returns the references to the paths of the generated audio files.",
     args_schema=TTSInput,
 )
 def call_tts(
@@ -114,20 +130,37 @@ def call_tts(
     generations = convert_text_to_speech(voice_text_parts)
 
     message_lines = ["Successfully generated audio files:"]
+    generation_artifacts: list[TTSGenerationArtifact] = []
     for generation in generations:
         text = (
             f"{generation.input[:32]}..."
             if len(generation.input) > 32
             else generation.input
         )
-        message_lines.append(
-            f"  - {generation.voice}: {text} -> {generation.file_path}"
+
+        reference_key = get_reference_key(
+            runtime.store,
+            runtime.config["configurable"]["user_id"],
+            generation.file_path,
+        )
+        message_lines.append(f"  - {generation.voice}: {text} -> {reference_key}")
+
+        # Convert TTS generations to TTS generation artifacts.
+        generation_artifacts.append(
+            TTSGenerationArtifact(
+                base64_data=generation.base64_data,
+                cached=generation.cached,
+                file_path_ref=reference_key,
+                input=generation.input,
+                model=generation.model,
+                voice=generation.voice,
+            )
         )
 
     tool_message = ToolMessage(
         content="\n".join(message_lines),
         tool_call_id=runtime.tool_call_id,
-        artifact=generations,
+        artifact=generation_artifacts,
     )
 
     tool_message.pretty_print()

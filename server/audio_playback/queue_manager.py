@@ -29,7 +29,7 @@ class QueueManager:
         self,
         name: str,
         files: list[str] | None = None,
-        volume: int = 100,
+        volume: float = 1.0,
     ) -> AudioQueue:
         """Create a new queue or get existing one."""
         async with self._lock:
@@ -83,7 +83,7 @@ class QueueManager:
         self,
         name: str,
         files: list[str],
-        volume: int | None = None,
+        volume: float | None = None,
     ) -> AudioQueue:
         """Append files to an existing queue or create new one."""
         async with self._lock:
@@ -95,7 +95,7 @@ class QueueManager:
                 return queue
 
         # Queue doesn't exist, create it
-        return await self.create_queue(name, files, volume or 100)
+        return await self.create_queue(name, files, volume or 1.0)
 
     async def remove_queue(self, name: str) -> bool:
         """Stop and remove a queue."""
@@ -119,7 +119,7 @@ class QueueManager:
             logger.info(f"Removed queue: {name}")
             return True
 
-    async def set_volume(self, name: str, volume: int) -> bool:
+    async def set_volume(self, name: str, volume: float) -> bool:
         """Set volume for a queue."""
         queue = self._queues.get(name)
         if queue:
@@ -164,6 +164,6 @@ class QueueManager:
             await self.create_queue(
                 name=state["name"],
                 files=state.get("files", []),
-                volume=state.get("volume", 100),
+                volume=state.get("volume", 1.0),
             )
         logger.info(f"Restored {len(states)} queues from state")

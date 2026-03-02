@@ -16,7 +16,7 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -169,7 +169,7 @@ async def set_audio_volume(name: str, request: VolumeUpdate):
 
     Args:
         name: Name of the audio queue
-        request: New volume level (0-100)
+        request: New volume level (0.0-1.0)
     """
     success = await queue_manager.set_volume(name, request.volume)
     if not success:
@@ -207,7 +207,8 @@ async def audio_service_health():
 
 if __name__ == "__main__":
     from fastmcp import FastMCP
-    from fastmcp.server.openapi import RouteMap, MCPType, HTTPRoute, OpenAPITool
+    from fastmcp.server.openapi import OpenAPITool, RouteMap, MCPType
+    from fastmcp.utilities.openapi import HTTPRoute
 
     def simplify_descriptions(
         route: HTTPRoute,

@@ -4,13 +4,17 @@ fastmcp
 langchain
 langchain-mcp-adapters
 langchain[openai]
+langgraph-checkpoint-postgres
 langgraph-cli[inmem]
 mlx-audio
 mlx-lm
 mlx-whisper
+psycopg[binary,pool]
 pydantic
 python-vlc
+setuptools<81
 simpleaudio
 sounddevice
 soundfile
 torch
+webrtcvad

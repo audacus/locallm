@@ -10,11 +10,11 @@ class QueueCreate(BaseModel):
         default_factory=list,
         description="List of absolute file paths to audio files (e.g., MP3, WAV, FLAC) to play in sequence",
     )
-    volume: int = Field(
-        default=100,
-        ge=0,
-        le=100,
-        description="Playback volume level from 0 (muted) to 100 (full volume)",
+    volume: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Playback volume level from 0.0 (muted) to 1.0 (full volume)",
     )
 
 
@@ -22,7 +22,7 @@ class QueueStatus(BaseModel):
     """Current state of an audio playback queue."""
 
     name: str = Field(description="Unique name of this audio queue")
-    volume: int = Field(description="Current volume level (0-100)")
+    volume: float = Field(description="Current volume level (0.0-1.0)")
     current_file: str | None = Field(description="Path to the audio file currently playing, or null if idle")
     current_position: float = Field(description="Current playback position in seconds")
     current_duration: float = Field(description="Total duration of the current track in seconds")
@@ -34,7 +34,7 @@ class QueueInfo(BaseModel):
     """Summary information about an audio playback queue."""
 
     name: str = Field(description="Unique name of this audio queue")
-    volume: int = Field(description="Current volume level (0-100)")
+    volume: float = Field(description="Current volume level (0.0-1.0)")
     is_playing: bool = Field(description="True if audio is currently playing")
     file_count: int = Field(description="Total number of audio files in queue (including current)")
 
@@ -42,10 +42,10 @@ class QueueInfo(BaseModel):
 class VolumeUpdate(BaseModel):
     """New volume level for audio playback."""
 
-    volume: int = Field(
-        ge=0,
-        le=100,
-        description="Volume level from 0 (muted) to 100 (full volume)",
+    volume: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Volume level from 0.0 (muted) to 1.0 (full volume)",
     )
 
 

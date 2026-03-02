@@ -17,7 +17,7 @@ class AudioQueue:
     def __init__(
         self,
         name: str,
-        volume: int = 100,
+        volume: float = 1.0,
         on_empty: Callable[["AudioQueue"], None] | None = None,
     ):
         self.name = name
@@ -31,7 +31,7 @@ class AudioQueue:
         # Create VLC instance and player
         self._vlc_instance = vlc.Instance("--no-xlib")
         self._player = self._vlc_instance.media_player_new()
-        self._player.audio_set_volume(volume)
+        self._player.audio_set_volume(int(volume * 100))
 
         # Set up event manager for end of media
         self._event_manager = self._player.event_manager()
@@ -61,13 +61,13 @@ class AudioQueue:
             self._loop.call_soon_threadsafe(self._media_ended_event.set)
 
     @property
-    def volume(self) -> int:
+    def volume(self) -> float:
         return self._volume
 
     @volume.setter
-    def volume(self, value: int):
-        self._volume = max(0, min(100, value))
-        self._player.audio_set_volume(self._volume)
+    def volume(self, value: float):
+        self._volume = max(0.0, min(1.0, value))
+        self._player.audio_set_volume(int(self._volume * 100))
 
     @property
     def current_file(self) -> str | None:
@@ -154,7 +154,7 @@ class AudioQueue:
 
         media = self._vlc_instance.media_new(file_path)
         self._player.set_media(media)
-        self._player.audio_set_volume(self._volume)
+        self._player.audio_set_volume(int(self._volume * 100))
 
         self._media_ended_event.clear()
         self._player.play()
@@ -192,7 +192,7 @@ class AudioQueue:
         """Create a queue from saved state."""
         queue = cls(
             name=state["name"],
-            volume=state.get("volume", 100),
+            volume=state.get("volume", 1.0),
             on_empty=on_empty,
         )
         if state.get("files"):
