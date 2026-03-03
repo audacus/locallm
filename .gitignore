@@ -4,5 +4,7 @@
 .langgraph_api/
 .venv
 __pycache__/
+attachments/
 generated/
+server/audio_playback/state.json
 test_files/

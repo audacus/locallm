@@ -4,10 +4,6 @@
       "type": "http",
       "url": "http://localhost:2024/mcp"
     },
-    "audio-playback": {
-      "type": "http",
-      "url": "http://localhost:8124/mcp"
-    },
     "docs-langchain": {
       "type": "http",
       "url": "https://docs.langchain.com/mcp"

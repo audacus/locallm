@@ -206,37 +206,13 @@ async def audio_service_health():
 
 
 if __name__ == "__main__":
-    from fastmcp import FastMCP
-    from fastmcp.server.openapi import OpenAPITool, RouteMap, MCPType
-    from fastmcp.utilities.openapi import HTTPRoute
+    import uvicorn
 
-    def simplify_descriptions(
-        route: HTTPRoute,
-        component: OpenAPITool,
-    ) -> None:
-        """Strip verbose OpenAPI schema details, keep only the docstring."""
-        if isinstance(component, OpenAPITool):
-            # Keep only the first paragraph (the original docstring summary)
-            component.description = component.description.split("\n\n")[0]
-
-    # Convert to MCP server with customizations
-    mcp = FastMCP.from_fastapi(
-        app=app,
-        route_maps=[
-            # Exclude /health endpoint from MCP tools
-            RouteMap(methods=["GET"], pattern=r"/health", mcp_type=MCPType.EXCLUDE),
-        ],
-        mcp_component_fn=simplify_descriptions,
-    )
-
-    base_url = os.getenv("MCP_URL_AUDIO_PLAYBACK")
-    port = 8000
+    # Add the port from the API base URL to the arguments to start the server at the defined prot.
+    base_url = os.getenv("API_BASE_URL_AUDIO_PLAYBACK")
+    port = 8003
     if base_url is not None:
         parsed = urlparse(base_url)
         port = parsed.port
 
-    mcp.run(
-        transport="http",
-        show_banner=True,
-        port=port,
-    )
+    uvicorn.run(app, host="0.0.0.0", port=port)

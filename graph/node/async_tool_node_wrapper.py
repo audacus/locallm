@@ -7,8 +7,8 @@ from graph.tools import get_tools
 
 
 async def async_tool_node_wrapper(state: MessagesState) -> Command:
-    """Wrap the pre-built `ToolNode` in an asynchronous node for passing the asynchronously initialized tool list."""
-    tool_node = ToolNode(tools=await get_tools(), handle_tool_errors=False)
+    """Wrap the pre-built `ToolNode` in an asynchronous node for passing the tool list."""
+    tool_node = ToolNode(tools=get_tools(), handle_tool_errors=False)
 
     result: ToolMessage | Command = await tool_node.ainvoke(input=state)
 

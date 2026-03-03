@@ -15,6 +15,7 @@ from langgraph.types import Command
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from graph.models import OrchestratorContext
 from store.references import get_reference_key
 
 load_dotenv()
@@ -27,7 +28,7 @@ openai_client = OpenAI(
 
 class VoiceTextPart(BaseModel):
     voice: Literal["af_heart", "am_michael"] = Field(
-        description="Voice to generate the speech."
+        description="Voice for generating the speech."
     )
     text: str = Field(description="Text to convert to speech.")
 
@@ -120,9 +121,9 @@ def convert_text_to_speech(
     description="Converts a list of voice/text parts to speech and returns the references to the paths of the generated audio files.",
     args_schema=TTSInput,
 )
-def call_tts(
+async def call_tts(
     voice_text_parts: list[VoiceTextPart],
-    runtime: ToolRuntime[None, MessagesState],
+    runtime: ToolRuntime[OrchestratorContext, MessagesState],
 ) -> Command:
     if len(voice_text_parts) == 0:
         raise ToolException("No parts given!")
@@ -138,9 +139,9 @@ def call_tts(
             else generation.input
         )
 
-        reference_key = get_reference_key(
+        reference_key = await get_reference_key(
             runtime.store,
-            runtime.config["configurable"]["user_id"],
+            runtime.context["user_id"],
             generation.file_path,
         )
         message_lines.append(f"  - {generation.voice}: {text} -> {reference_key}")

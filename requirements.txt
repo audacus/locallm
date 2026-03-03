@@ -6,6 +6,7 @@ langchain-mcp-adapters
 langchain[openai]
 langgraph-checkpoint-postgres
 langgraph-cli[inmem]
+misaki
 mlx-audio
 mlx-lm
 mlx-whisper

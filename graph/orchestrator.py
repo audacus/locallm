@@ -1,6 +1,11 @@
+import base64
+import fnmatch
 import json
 import os
+import time
 import uuid
+from hashlib import md5
+from pathlib import Path
 from typing import TypedDict, Annotated, NotRequired
 
 from dotenv import load_dotenv
@@ -21,13 +26,16 @@ from langchain_openai import ChatOpenAI
 from langgraph.constants import END
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.prebuilt import tools_condition
+from langgraph.runtime import Runtime
 from langgraph.types import Command
 from pydantic import SecretStr
 
+from graph.models import OrchestratorContext
 from graph.node.async_tool_node_wrapper import async_tool_node_wrapper
 from graph.node.output_shaper import output_shaper
 from graph.tools import get_tools, get_tool_list
 from prompt.orchestrator import ORCHESTRATOR_SYSTEM_PROMPT
+from store.references import get_reference_key
 
 load_dotenv()
 
@@ -52,9 +60,10 @@ class OrchestratorOutputState(TypedDict):
 
 async def call_orchestrator(
     state: OrchestratorState,
+    runtime: Runtime[OrchestratorContext],
 ) -> Command:
     # Build system prompt and prepend to input messages.
-    tool_list = await get_tool_list()
+    tool_list = get_tool_list()
     system_message = SystemMessage(
         content_blocks=[
             create_text_block(
@@ -64,8 +73,61 @@ async def call_orchestrator(
         ]
     )
 
+    # Handle attached files.
+    attachment_dir = Path(os.getenv("ATTACHMENT_DIR"))
+    file_counter = 1
+    for message in state["messages"]:
+        for content_block in message.content_blocks:
+            if content_block["type"] == "file" and isinstance(
+                content_block["base64"], str
+            ):
+                # Allow re-use of attached files.
+                attachment_hash = md5(
+                    content_block["base64"].encode("ascii")
+                ).hexdigest()
+                file_path = attachment_dir.joinpath(
+                    f"{int(time.time())}-{attachment_hash}"
+                )
+
+                # Create directory or search for already attached file.
+                reuse_attached_file = False
+                if not os.path.exists(attachment_dir):
+                    os.makedirs(attachment_dir)
+                else:
+                    for file_name in os.listdir(attachment_dir):
+                        if fnmatch.fnmatch(file_name, f"*{attachment_hash}"):
+                            file_path = attachment_dir.joinpath(file_name)
+                            print("Using already attached file:", file_name)
+                            reuse_attached_file = True
+
+                if not reuse_attached_file:
+                    with open(file_path, "wb") as f:
+                        f.write(
+                            base64.b64decode(content_block["base64"].encode("ascii"))
+                        )
+
+                attachment_ref = await get_reference_key(
+                    runtime.store,
+                    runtime.context["user_id"],
+                    str(file_path),
+                )
+
+                # Transform file content block to text content block.
+                lines = [
+                    f"File #{file_counter}:",
+                    f"  File path reference: {attachment_ref}",
+                    f"  MIME type: {content_block["mime_type"]}",
+                ]
+                content_block["type"] = "text"
+                content_block["text"] = "\n".join(lines)
+                # Unset file content block specific properties.
+                del content_block["base64"]
+                del content_block["mime_type"]
+
+                file_counter += 1
+
     messages = [system_message, *state["messages"]]
-    tools = await get_tools()
+    tools = get_tools()
     orchestrator_model_with_tools = orchestrator_model.bind_tools(
         tools=[write_todos, *tools]
     )

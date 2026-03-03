@@ -19,7 +19,7 @@ cp .env.example .env
 # mlx-audio
 .venv/bin/python server/mlx_audio/main.py
 
-# audio playback (MCP)
+# audio playback
 .venv/bin/python server/audio_playback/main.py
 ```
 

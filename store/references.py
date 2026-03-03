@@ -4,12 +4,12 @@ REFERENCE_INDEX_KEY = "REF_INDEX"
 REFERENCE_KEY_TEMPLATE = "REF_{index}"
 
 
-def get_reference_key(store: BaseStore, user_id: str, value: str) -> str:
+async def get_reference_key(store: BaseStore, user_id: str, value: str) -> str:
     """Create and return a new reference key for given value or return the existing reference key."""
 
     # Search for existing references.
     namespace = (user_id, "references")
-    existing_reference = store.search(
+    existing_reference = await store.asearch(
         namespace,
         filter={"value": value},
         limit=1,
@@ -20,13 +20,13 @@ def get_reference_key(store: BaseStore, user_id: str, value: str) -> str:
         reference_index = 1
 
         # Get reference index.
-        reference_index_item = store.get(namespace, REFERENCE_INDEX_KEY)
+        reference_index_item = await store.aget(namespace, REFERENCE_INDEX_KEY)
 
         # Setup reference index item, if it does not exist or is not an integer.
         if reference_index_item is None or not isinstance(
             reference_index_item.value["value"], int
         ):
-            store.put(
+            await store.aput(
                 namespace=namespace,
                 key=REFERENCE_INDEX_KEY,
                 value={"value": reference_index},
@@ -35,7 +35,7 @@ def get_reference_key(store: BaseStore, user_id: str, value: str) -> str:
             # Get next reference index.
             reference_index = int(reference_index_item.value["value"]) + 1
             # Update reference index item with next index.
-            store.put(
+            await store.aput(
                 namespace=namespace,
                 key=REFERENCE_INDEX_KEY,
                 value={"value": reference_index},
@@ -43,7 +43,7 @@ def get_reference_key(store: BaseStore, user_id: str, value: str) -> str:
 
         # Save new reference.
         reference_key = REFERENCE_KEY_TEMPLATE.format(index=reference_index)
-        store.put(
+        await store.aput(
             namespace=namespace,
             key=reference_key,
             value={"value": value},
@@ -56,10 +56,10 @@ def get_reference_key(store: BaseStore, user_id: str, value: str) -> str:
         return existing_reference[0].key
 
 
-def get_reference_value(store: BaseStore, user_id: str, key: str) -> str | None:
+async def get_reference_value(store: BaseStore, user_id: str, key: str) -> str | None:
     """Return the value for the given reference key."""
 
-    reference_item = store.get(
+    reference_item = await store.aget(
         namespace=(user_id, "references"),
         key=key,
     )

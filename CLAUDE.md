@@ -4,7 +4,7 @@
 
 - mlx-lm: `.venv/bin/python server/mlx_lm/main.py`
 - mlx-audio: `venv/bin/python server/mlx_audio/main.py`
-- audio playback (MCP): `.venv/bin/python server/audio_playback/main.py`
+- audio playback: `.venv/bin/python server/audio_playback/main.py`
 
 ## Agent
 
