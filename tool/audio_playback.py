@@ -117,10 +117,9 @@ async def play_audio_queue(
         raise ToolException("No file path references given!")
 
     # Resolve reference keys to actual file paths.
-    user_id = runtime.context["user_id"]
     file_paths: list[str] = []
     for ref in file_path_refs:
-        path = await get_reference_value(runtime.store, user_id, ref)
+        path = await get_reference_value(runtime.store, runtime.context["user_id"], ref)
         if path is None:
             raise ToolException(f"Reference '{ref}' not found.")
         file_paths.append(path)

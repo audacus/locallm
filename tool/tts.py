@@ -12,7 +12,7 @@ from langchain_core.tools import tool, ToolException
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
-from openai import OpenAI
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 from graph.models import OrchestratorContext
@@ -20,15 +20,15 @@ from store.references import get_reference_key
 
 load_dotenv()
 
-openai_client = OpenAI(
+openai_client = AsyncOpenAI(
     api_key="none",
     base_url=os.getenv("API_BASE_URL_MLX_AUDIO"),
 )
 
 
 class VoiceTextPart(BaseModel):
-    voice: Literal["af_heart", "am_michael"] = Field(
-        description="Voice for generating the speech."
+    voice: Literal["af_heart", "af_bella", "am_fenrir", "am_michael"] = Field(
+        description="Voice for generating the speech.\nPrefix:\n- `af_` => American English female\n- `am_` => American English male"
     )
     text: str = Field(description="Text to convert to speech.")
 
@@ -40,24 +40,24 @@ class TTSInput(BaseModel):
 
 
 class TTSGeneration(BaseModel):
+    audio_file_path: str
     base64_data: str
     cached: bool
-    file_path: str
     input: str
     model: str
     voice: str
 
 
 class TTSGenerationArtifact(BaseModel):
+    audio_file_path_ref: str
     base64_data: str
     cached: bool
-    file_path_ref: str
     input: str
     model: str
     voice: str
 
 
-def convert_text_to_speech(
+async def convert_text_to_speech(
     voice_text_parts: list[VoiceTextPart],
 ) -> list[TTSGeneration]:
     model = os.getenv("MODEL_TTS")
@@ -69,7 +69,7 @@ def convert_text_to_speech(
             f"{model}-{voice_text_part.voice}-{voice_text_part.text}".encode("utf-8")
         ).hexdigest()
         generated_audio_dir = Path(os.getenv("TTS_OUTPUT_DIR"))
-        file_path = generated_audio_dir.joinpath(
+        audio_file_path = generated_audio_dir.joinpath(
             f"{int(time.time())}-{generation_hash}.wav"
         )
 
@@ -80,7 +80,7 @@ def convert_text_to_speech(
         else:
             for file_name in os.listdir(generated_audio_dir):
                 if fnmatch.fnmatch(file_name, f"*{generation_hash}.wav"):
-                    file_path = generated_audio_dir.joinpath(file_name)
+                    audio_file_path = generated_audio_dir.joinpath(file_name)
                     print(
                         "Using cached file:",
                         voice_text_part.voice,
@@ -89,24 +89,25 @@ def convert_text_to_speech(
                     use_cached_file = True
 
         if not use_cached_file:
-            with openai_client.audio.speech.with_streaming_response.create(
+            # Effective TTS request.
+            async with openai_client.audio.speech.with_streaming_response.create(
                 model=model,
                 voice=voice_text_part.voice,
                 input=voice_text_part.text,
             ) as response:
-                response.stream_to_file(file_path)
+                await response.stream_to_file(audio_file_path)
 
         try:
-            with open(file_path, "rb") as audio_file:
+            with open(audio_file_path, "rb") as audio_file:
                 base64_data = base64.b64encode(audio_file.read()).decode("utf-8")
-        except FileNotFoundError as e:
+        except Exception as e:
             raise ToolException(f"There was an error reading the generated file: {e}")
 
         generations.append(
             TTSGeneration(
                 base64_data=base64_data,
                 cached=use_cached_file,
-                file_path=str(file_path),
+                audio_file_path=str(audio_file_path),
                 input=voice_text_part.text,
                 model=model,
                 voice=voice_text_part.voice,
@@ -121,14 +122,14 @@ def convert_text_to_speech(
     description="Converts a list of voice/text parts to speech and returns the references to the paths of the generated audio files.",
     args_schema=TTSInput,
 )
-async def call_tts(
+async def call_convert_text_to_speech(
     voice_text_parts: list[VoiceTextPart],
     runtime: ToolRuntime[OrchestratorContext, MessagesState],
 ) -> Command:
     if len(voice_text_parts) == 0:
         raise ToolException("No parts given!")
 
-    generations = convert_text_to_speech(voice_text_parts)
+    generations = await convert_text_to_speech(voice_text_parts)
 
     message_lines = ["Successfully generated audio files:"]
     generation_artifacts: list[TTSGenerationArtifact] = []
@@ -139,19 +140,19 @@ async def call_tts(
             else generation.input
         )
 
-        reference_key = await get_reference_key(
+        reference_key_audio_file_path = await get_reference_key(
             runtime.store,
             runtime.context["user_id"],
-            generation.file_path,
+            generation.audio_file_path,
         )
-        message_lines.append(f"  - {generation.voice}: {text} -> {reference_key}")
+        message_lines.append(f"  - Input: {generation.voice}: {text} -> Generated audio file: {reference_key_audio_file_path}")
 
         # Convert TTS generations to TTS generation artifacts.
         generation_artifacts.append(
             TTSGenerationArtifact(
                 base64_data=generation.base64_data,
                 cached=generation.cached,
-                file_path_ref=reference_key,
+                audio_file_path_ref=reference_key_audio_file_path,
                 input=generation.input,
                 model=generation.model,
                 voice=generation.voice,
@@ -163,7 +164,5 @@ async def call_tts(
         tool_call_id=runtime.tool_call_id,
         artifact=generation_artifacts,
     )
-
     tool_message.pretty_print()
-
     return Command(update={"messages": [tool_message]})

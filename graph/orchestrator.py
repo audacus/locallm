@@ -40,7 +40,6 @@ from store.references import get_reference_key
 load_dotenv()
 
 orchestrator_model = ChatOpenAI(
-    async_client=True,
     base_url=os.getenv("API_BASE_URL_MLX_LM"),
     api_key=SecretStr("none"),
     model=os.getenv("MODEL_ORCHESTRATOR"),
@@ -69,7 +68,8 @@ async def call_orchestrator(
             create_text_block(
                 text=ORCHESTRATOR_SYSTEM_PROMPT.format(tool_list=tool_list)
             ),
-            create_text_block(text=WRITE_TODOS_SYSTEM_PROMPT),
+            # TODO: removed TODOs tooling system prompt.
+            # create_text_block(text=WRITE_TODOS_SYSTEM_PROMPT),
         ]
     )
 
@@ -129,9 +129,11 @@ async def call_orchestrator(
     messages = [system_message, *state["messages"]]
     tools = get_tools()
     orchestrator_model_with_tools = orchestrator_model.bind_tools(
-        tools=[write_todos, *tools]
+        tools=[*tools]
+        # TODO: removed TODOs tooling.
+        # tools=[write_todos, *tools]
     )
-    response: AIMessage = orchestrator_model_with_tools.invoke(input=messages)
+    response: AIMessage = await orchestrator_model_with_tools.ainvoke(input=messages)
 
     # Special handling for `xLAM 2`.
     # Try to decode the response as JSON array of tool calls.
