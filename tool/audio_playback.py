@@ -3,7 +3,7 @@ import os
 import httpx
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage
-from langchain_core.tools import tool, ToolException
+from langchain_core.tools import tool
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
@@ -73,29 +73,29 @@ def _skip_track(queue_name: str) -> dict:
 
 class PlayAudioInput(BaseModel):
     queue_name: str = Field(
-        description="Unique name for the audio queue (e.g., 'music', 'tts', 'alerts')."
+        description="Unique name for the audio queue (e.g., 'music', 'tts', 'alerts')"
     )
     file_path_refs: list[str] = Field(
-        description="List of reference keys (e.g., 'REF_1', 'REF_2') pointing to audio file paths."
+        description="List of reference keys (e.g., 'REF_1', 'REF_2') pointing to audio file paths"
     )
     volume: float = Field(
         default=1.0,
         ge=0.0,
         le=1.0,
-        description="Playback volume from 0.0 (muted) to 1.0 (full volume).",
+        description="Playback volume from 0.0 (muted) to 1.0 (full volume)",
     )
 
 
 class QueueNameInput(BaseModel):
-    queue_name: str = Field(description="Name of the audio queue.")
+    queue_name: str = Field(description="Name of the audio queue")
 
 
 class SetVolumeInput(BaseModel):
-    queue_name: str = Field(description="Name of the audio queue.")
+    queue_name: str = Field(description="Name of the audio queue")
     volume: float = Field(
         ge=0.0,
         le=1.0,
-        description="Volume level from 0.0 (muted) to 1.0 (full volume).",
+        description="Volume level from 0.0 (muted) to 1.0 (full volume)",
     )
 
 
@@ -114,14 +114,26 @@ async def play_audio_queue(
     runtime: ToolRuntime[OrchestratorContext, MessagesState],
 ) -> Command:
     if len(file_path_refs) == 0:
-        raise ToolException("No file path references given!")
+        tool_error_message = ToolMessage(
+            content="No file path references given!",
+            status="error",
+            tool_call_id=runtime.tool_call_id,
+        )
+        tool_error_message.pretty_print()
+        return Command(update={"messages": [tool_error_message]})
 
     # Resolve reference keys to actual file paths.
     file_paths: list[str] = []
     for ref in file_path_refs:
         path = await get_reference_value(runtime.store, runtime.context["user_id"], ref)
         if path is None:
-            raise ToolException(f"Reference '{ref}' not found.")
+            tool_message = ToolMessage(
+                content=f"Reference '{ref}' not found.",
+                status="error",
+                tool_call_id=runtime.tool_call_id,
+            )
+            tool_message.pretty_print()
+            return Command(update={"messages": [tool_message]})
         file_paths.append(path)
 
     status = _play_audio(queue_name, file_paths, volume)
@@ -181,7 +193,13 @@ async def get_audio_queue_status(
         status = _get_queue_status(queue_name)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            raise ToolException(f"Queue '{queue_name}' not found.")
+            tool_error_message = ToolMessage(
+                content=f"Queue '{queue_name}' not found.",
+                status="error",
+                tool_call_id=runtime.tool_call_id,
+            )
+            tool_error_message.pretty_print()
+            return Command(update={"messages": [tool_error_message]})
         raise
 
     playing = "playing" if status["is_playing"] else "idle"
@@ -219,7 +237,13 @@ def stop_audio_queue(
         result = _stop_queue(queue_name)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            raise ToolException(f"Queue '{queue_name}' not found.")
+            tool_error_message = ToolMessage(
+                content=f"Queue '{queue_name}' not found.",
+                status="error",
+                tool_call_id=runtime.tool_call_id,
+            )
+            tool_error_message.pretty_print()
+            return Command(update={"messages": [tool_error_message]})
         raise
 
     tool_message = ToolMessage(
@@ -261,7 +285,13 @@ def set_audio_volume(
         _set_volume(queue_name, volume)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            raise ToolException(f"Queue '{queue_name}' not found.")
+            tool_error_message = ToolMessage(
+                content=f"Queue '{queue_name}' not found.",
+                status="error",
+                tool_call_id=runtime.tool_call_id,
+            )
+            tool_error_message.pretty_print()
+            return Command(update={"messages": [tool_error_message]})
         raise
 
     tool_message = ToolMessage(
@@ -285,7 +315,13 @@ def skip_audio_track(
         _skip_track(queue_name)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            raise ToolException(f"Queue '{queue_name}' not found.")
+            tool_error_message = ToolMessage(
+                content=f"Queue '{queue_name}' not found.",
+                status="error",
+                tool_call_id=runtime.tool_call_id,
+            )
+            tool_error_message.pretty_print()
+            return Command(update={"messages": [tool_error_message]})
         raise
 
     tool_message = ToolMessage(

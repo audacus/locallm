@@ -8,7 +8,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage
-from langchain_core.tools import tool, ToolException
+from langchain_core.tools import tool
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
@@ -30,12 +30,12 @@ class VoiceTextPart(BaseModel):
     voice: Literal["af_heart", "af_bella", "am_fenrir", "am_michael"] = Field(
         description="Voice for generating the speech.\nPrefix:\n- `af_` => American English female\n- `am_` => American English male"
     )
-    text: str = Field(description="Text to convert to speech.")
+    text: str = Field(description="Text to convert to speech")
 
 
 class TTSInput(BaseModel):
     voice_text_parts: list[VoiceTextPart] = Field(
-        description="List of voice/text parts to convert to speech."
+        description="List of voice/text parts to convert to speech"
     )
 
 
@@ -57,7 +57,7 @@ class TTSGenerationArtifact(BaseModel):
     voice: str
 
 
-async def convert_text_to_speech(
+async def generate_speech(
     voice_text_parts: list[VoiceTextPart],
 ) -> list[TTSGeneration]:
     model = os.getenv("MODEL_TTS")
@@ -101,7 +101,7 @@ async def convert_text_to_speech(
             with open(audio_file_path, "rb") as audio_file:
                 base64_data = base64.b64encode(audio_file.read()).decode("utf-8")
         except Exception as e:
-            raise ToolException(f"There was an error reading the generated file: {e}")
+            raise IOError(f"There was an error reading the generated file: {e}")
 
         generations.append(
             TTSGeneration(
@@ -118,20 +118,35 @@ async def convert_text_to_speech(
 
 
 @tool(
-    "convert_texts_to_speech_audio_files",
+    "convert_text_to_speech",
     description="Converts a list of voice/text parts to speech and returns the references to the paths of the generated audio files.",
     args_schema=TTSInput,
 )
-async def call_convert_text_to_speech(
+async def convert_text_to_speech(
     voice_text_parts: list[VoiceTextPart],
     runtime: ToolRuntime[OrchestratorContext, MessagesState],
 ) -> Command:
     if len(voice_text_parts) == 0:
-        raise ToolException("No parts given!")
+        tool_error_message = ToolMessage(
+            content="No parts given!",
+            status="error",
+            tool_call_id=runtime.tool_call_id,
+        )
+        tool_error_message.pretty_print()
+        return Command(update={"messages": [tool_error_message]})
 
-    generations = await convert_text_to_speech(voice_text_parts)
+    try:
+        generations = await generate_speech(voice_text_parts)
+    except Exception as e:
+        tool_error_message = ToolMessage(
+            content=f"{e}",
+            status="error",
+            tool_call_id=runtime.tool_call_id,
+        )
+        tool_error_message.pretty_print()
+        return Command(update={"messages": [tool_error_message]})
 
-    message_lines = ["Successfully generated audio files:"]
+    message_lines = ["Successfully generated speech audio files:"]
     generation_artifacts: list[TTSGenerationArtifact] = []
     for generation in generations:
         text = (
@@ -145,7 +160,9 @@ async def call_convert_text_to_speech(
             runtime.context["user_id"],
             generation.audio_file_path,
         )
-        message_lines.append(f"  - Input: {generation.voice}: {text} -> Generated audio file: {reference_key_audio_file_path}")
+        message_lines.append(
+            f"  - Input: {generation.voice}: {text} -> Voice audio saved to: {reference_key_audio_file_path}"
+        )
 
         # Convert TTS generations to TTS generation artifacts.
         generation_artifacts.append(

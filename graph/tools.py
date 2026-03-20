@@ -10,17 +10,17 @@ from tool.audio_playback import (
     stop_audio_queue,
 )
 from tool.general import sleep, read_file, get_mime_type
+from tool.language import translate_text
 from tool.stt import call_transcribe_audio
-from tool.tts import call_convert_text_to_speech
+from tool.tts import convert_text_to_speech
 
 
 def get_tools() -> list[BaseTool]:
     return [
+        convert_text_to_speech,
         call_transcribe_audio,
-        call_convert_text_to_speech,
         get_audio_queue_status,
-        # TODO: don't add unnecessary tool.
-        # get_mime_type,
+        get_mime_type,
         list_audio_queues,
         play_audio_queue,
         read_file,
@@ -29,6 +29,7 @@ def get_tools() -> list[BaseTool]:
         sleep,
         stop_all_audio_queues,
         stop_audio_queue,
+        translate_text,
     ]
 
 

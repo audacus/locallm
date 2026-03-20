@@ -114,7 +114,7 @@ async def call_orchestrator(
 
                 # Transform file content block to text content block.
                 lines = [
-                    f"File #{file_counter}:",
+                    f"Attached file #{file_counter}:",
                     f"  File path reference: {attachment_ref}",
                     f"  MIME type: {content_block["mime_type"]}",
                 ]
@@ -137,7 +137,7 @@ async def call_orchestrator(
 
     # Special handling for `xLAM 2`.
     # Try to decode the response as JSON array of tool calls.
-    if "xlam-2" in response.response_metadata["model_name"].lower():
+    if "model_name" in response.response_metadata and "xlam-2" in response.response_metadata["model_name"].lower():
         tool_calls: list[ToolCall] = []
         try:
             obj = json.loads(response.text)

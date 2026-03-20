@@ -40,7 +40,7 @@ async def sleep(
     await asyncio.sleep(seconds)
 
     tool_message = ToolMessage(
-        content=f"Slept for {seconds} seconds.",
+        content=f"Done. Slept for {seconds} seconds.",
         tool_call_id=runtime.tool_call_id,
     )
     tool_message.pretty_print()
@@ -60,7 +60,13 @@ async def read_file(
         runtime.store, runtime.context["user_id"], file_path_ref
     )
     if file_path is None:
-        raise ToolException(f"Reference '{file_path_ref}' not found.")
+        tool_error_message = ToolMessage(
+            content=f"Reference '{file_path_ref}' not found.",
+            status="error",
+            tool_call_id=runtime.tool_call_id,
+        )
+        tool_error_message.pretty_print()
+        return Command(update={"messages": [tool_error_message]})
 
     with open(file_path, "r") as file:
         content = file.read()
@@ -86,7 +92,13 @@ async def get_mime_type(
         runtime.store, runtime.context["user_id"], file_path_ref
     )
     if file_path is None:
-        raise ToolException(f"Reference '{file_path_ref}' not found.")
+        tool_error_message = ToolMessage(
+            content=f"Reference '{file_path_ref}' not found.",
+            status="error",
+            tool_call_id=runtime.tool_call_id,
+        )
+        tool_error_message.pretty_print()
+        return Command(update={"messages": [tool_error_message]})
 
     mime_type, encoding = mimetypes.guess_type(file_path)
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage
-from langchain_core.tools import tool, ToolException
+from langchain_core.tools import tool
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
@@ -26,7 +26,7 @@ openai_client = AsyncOpenAI(
 
 class TranscriptionINput(BaseModel):
     file_path_refs: list[str] = Field(
-        description="List of reference keys (e.g., 'REF_1', 'REF_2') pointing to audio file paths."
+        description="List of reference keys (e.g., 'REF_1', 'REF_2') pointing to audio file paths"
     )
 
 
@@ -65,7 +65,7 @@ async def transcribe_audio(
             with open(audio_file_path, "rb") as audio_file:
                 audio_file_content = audio_file.read()
         except Exception as e:
-            raise ToolException(f"There was an error reading the input audio file: {e}")
+            raise IOError(f"There was an error reading the input audio file: {e}")
 
         # Create hash of audio input file content.
         audio_file_content_hash = md5(audio_file_content).hexdigest()
@@ -101,7 +101,7 @@ async def transcribe_audio(
                                 )
                             )
                     except Exception as e:
-                        raise ToolException(
+                        raise IOError(
                             f"There was an error reading the transcription file: {e}"
                         )
 
@@ -121,8 +121,8 @@ async def transcribe_audio(
                         transcription_file.write(
                             transcription_file_object.model_dump_json()
                         )
-                except IOError as e:
-                    raise ToolException(
+                except Exception as e:
+                    raise IOError(
                         f"There was an error writing the transcription file: {e}"
                     )
 
@@ -142,7 +142,7 @@ async def transcribe_audio(
 
 @tool(
     "transcribe_audio",
-    description="Transcribes a list of speech/audio files and creates transcription JSON files containing the transcription text and the detected language.",
+    description="Transcribes a list of speech/audio files and returns a list of created JSON files containing the transcribed text and the detected language.",
     args_schema=TranscriptionINput,
 )
 async def call_transcribe_audio(
@@ -150,7 +150,13 @@ async def call_transcribe_audio(
     runtime: ToolRuntime[OrchestratorContext, MessagesState],
 ) -> Command:
     if len(file_path_refs) == 0:
-        raise ToolException("No files given!")
+        tool_error_message = ToolMessage(
+            content="No files given!",
+            status="error",
+            tool_call_id=runtime.tool_call_id,
+        )
+        tool_error_message.pretty_print()
+        return Command(update={"messages": [tool_error_message]})
 
     # Resolve reference keys to actual file paths.
     file_paths: list[str] = []
@@ -159,12 +165,27 @@ async def call_transcribe_audio(
             runtime.store, runtime.context["user_id"], ref
         )
         if file_path is None:
-            raise ToolException(f"Reference '{ref}' not found.")
+            tool_error_message = ToolMessage(
+                content=f"Reference '{ref}' not found.",
+                status="error",
+                tool_call_id=runtime.tool_call_id,
+            )
+            tool_error_message.pretty_print()
+            return Command(update={"messages": [tool_error_message]})
         file_paths.append(file_path)
 
-    generations = await transcribe_audio(file_paths)
+    try:
+        generations = await transcribe_audio(file_paths)
+    except Exception as e:
+        tool_error_message = ToolMessage(
+            content=f"{e}",
+            status="error",
+            tool_call_id=runtime.tool_call_id,
+        )
+        tool_error_message.pretty_print()
+        return Command(update={"messages": [tool_error_message]})
 
-    message_lines = ["Successfully created transcription files:"]
+    message_lines = ["Successfully created JSON files containing the transcribed text:"]
     generation_artifacts: list[TranscriptionGenerationArtifact] = []
     for generation in generations:
         text = (
@@ -184,7 +205,7 @@ async def call_transcribe_audio(
             generation.text_file_path,
         )
         message_lines.append(
-            f"  - Input audio file: {reference_key_audio_file_path} -> Created transcription JSON file: {reference_key_text_file_path}"
+            f"  - Input audio file: {reference_key_audio_file_path} -> Transcribed text saved to: {reference_key_text_file_path}"
         )
 
         # Convert transcription generations to transcription generation artifacts.
