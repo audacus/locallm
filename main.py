@@ -2,6 +2,7 @@ import asyncio
 import base64
 import mimetypes
 import os
+import time
 import uuid
 
 from dotenv import load_dotenv
@@ -22,6 +23,7 @@ DB_URI = os.environ.get("POSTGRES_DB_URI")
 
 
 async def main():
+    start_time = time.time()
     async with (
         AsyncPostgresStore.from_conn_string(DB_URI) as store,
         AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer,
@@ -50,7 +52,9 @@ async def main():
             f.write(image_bytes)
 
         # Create file attachment.
-        file_path = "/Users/dbu/workspace/locallm/test_files/ch-8s.wav"
+        # file_path = "/Users/dbu/workspace/locallm/test_files/ch-8s.wav"
+        # file_path = "/Users/dbu/workspace/locallm/test_files/lean-on-me.mp3"
+        file_path = "/Users/dbu/workspace/locallm/test_files/naanaanaa.mp3"
         mime_type, encoding = mimetypes.guess_type(file_path)
         with open(file_path, "rb") as f:
             file_content = f.read()
@@ -58,33 +62,36 @@ async def main():
 
         # Simulate user input
         messages = [
-
-            # HumanMessage(content=""""
+            # HumanMessage(content="""
             # Play following conversation as audio:
             # - Hi there. How are you?
             # - Hey. I'm fine thanks, and you?
             # - Me too, thanks.
             # """),
-
-            # HumanMessage(
-            #     content_blocks=[
-            #         create_text_block(
-            #             text="Play the attached file as background music and list all queues. Wait for 10 seconds. After that stop the music and list all queues again.",
-            #         ),
-            #         create_file_block(base64=base64_data, mime_type=mime_type),
-            #     ],
-            # ),
-
             HumanMessage(
                 content_blocks=[
                     create_text_block(
-                        # text="Transcribe given audio, translate the text to English and play it as speech audio.",
-                        text="Translate the given audio to English.",
+                        text="""
+- Play the attached file as background music and wait 5 seconds.
+- Play following conversation as audio:
+    - Maria: Hey Johnny. How are you?
+    - Johnny: Hey Maria. I'm fine thanks, and you?
+    - Maria: Me too. thanks.
+- Wait 10 seconds, then stop all audio.
+                        """,
                     ),
                     create_file_block(base64=base64_data, mime_type=mime_type),
                 ],
             ),
-
+            # HumanMessage(content="Stop all music!")
+            # HumanMessage(
+            #     content_blocks=[
+            #         create_text_block(
+            #             text="Translate the given audio to English and play it as audio.",
+            #         ),
+            #         create_file_block(base64=base64_data, mime_type=mime_type),
+            #     ],
+            # ),
         ]
 
         await graph_compiled.ainvoke(
@@ -93,6 +100,9 @@ async def main():
             context=context,
             subgraphs=True,
         )
+
+        end_time = time.time()
+        print(f"\n>>> Worked for {end_time - start_time} seconds.")
 
 
 if __name__ == "__main__":
