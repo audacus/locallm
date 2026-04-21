@@ -1,6 +1,6 @@
 import asyncio
-import mimetypes
 
+import magic
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
@@ -102,7 +102,7 @@ async def get_mime_type(
         tool_error_message.pretty_print()
         return Command(update={"messages": [tool_error_message]})
 
-    mime_type, encoding = mimetypes.guess_type(file_path)
+    mime_type = magic.from_file(file_path, mime=True)
 
     tool_message = ToolMessage(
         content=f"MIME type of {file_path_ref}: {mime_type}",

@@ -15,6 +15,7 @@ num2words
 phonemizer-fork
 psycopg[binary,pool]
 pydantic
+python-magic
 python-vlc
 setuptools<81
 simpleaudio

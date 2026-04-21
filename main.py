@@ -1,13 +1,16 @@
 import asyncio
 import base64
-import mimetypes
 import os
 import time
 import uuid
 
+import magic
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
-from langchain_core.messages.content import create_text_block, create_file_block
+from langchain_core.messages.content import (
+    create_text_block,
+    create_image_block,
+)
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import AsyncPostgresStore
@@ -53,20 +56,22 @@ async def main():
         # Create file attachment.
         # file_path = "/Users/dbu/workspace/locallm/test_files/ch-8s.wav"
         # file_path = "/Users/dbu/workspace/locallm/test_files/lean-on-me.mp3"
-        file_path = "/Users/dbu/workspace/locallm/test_files/naanaanaa.mp3"
-        mime_type, encoding = mimetypes.guess_type(file_path)
+        # file_path = "/Users/dbu/workspace/locallm/test_files/naanaanaa.mp3"
+        # file_path = "/Users/dbu/workspace/locallm/test_files/people.jpg"
+        file_path = "/Users/dbu/workspace/locallm/test_files/people"
+        mime_type = magic.from_file(file_path)
         with open(file_path, "rb") as f:
             file_content = f.read()
             base64_data = base64.b64encode(file_content).decode("ascii")
 
         # Simulate user input
         messages = [
-            HumanMessage(content="""
-            Play following conversation as audio:
-            - Hi there. How are you?
-            - Hey. I'm fine thanks, and you?
-            - Me too, thanks.
-            """),
+#             HumanMessage(content="""
+# Play following conversation as audio:
+# - Hi there. How are you?
+# - Hey. I'm fine thanks, and you?
+# - Me too, thanks.
+#             """),
 
 #             HumanMessage(
 #                 content_blocks=[
@@ -93,6 +98,11 @@ async def main():
             #         create_file_block(base64=base64_data, mime_type=mime_type),
             #     ],
             # ),
+
+            HumanMessage(content_blocks=[
+                create_text_block(text="What MIME type has the attached file?"),
+                create_image_block(base64=base64_data, mime_type=mime_type),
+            ]),
         ]
 
         await graph_compiled.ainvoke(
