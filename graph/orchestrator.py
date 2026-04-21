@@ -64,54 +64,75 @@ async def call_orchestrator(
     attachment_dir = Path(os.getenv("ATTACHMENT_DIR"))
     file_counter = 1
     for message in state["messages"]:
-        for content_block in message.content_blocks:
-            if content_block["type"] == "file" and isinstance(
-                content_block["base64"], str
+        # Iterate `message.content` (not `content_blocks`) so in-place mutations
+        # actually reach the message that gets sent to the model. `content_blocks`
+        # returns a normalized copy when the raw content uses alternate shapes
+        # (e.g. LangSmith UI images with `source_type`/`data`).
+        if not isinstance(message.content, list):
+            continue
+        for content_block in message.content:
+            if not isinstance(content_block, dict):
+                continue
+            # Normalize attachment-like content blocks (files and base64 images)
+            # so they share the same save-to-disk + reference flow.
+            # Payloads may arrive as `{base64: ...}` (create_file_block /
+            # create_image_block) or `{source_type: "base64", data: ...}`
+            # (LangSmith UI upload, for both files and images).
+            if content_block["type"] not in ("file", "image"):
+                continue
+
+            if isinstance(content_block.get("base64"), str):
+                base64_data: str = content_block["base64"]
+            elif content_block.get("source_type") == "base64" and isinstance(
+                content_block.get("data"), str
             ):
-                # Allow re-use of attached files.
-                attachment_hash = md5(
-                    content_block["base64"].encode("ascii")
-                ).hexdigest()
-                file_path = attachment_dir.joinpath(
-                    f"{int(time.time())}-{attachment_hash}"
-                )
+                base64_data = content_block["data"]
+            else:
+                continue
 
-                # Create directory or search for already attached file.
-                reuse_attached_file = False
-                if not os.path.exists(attachment_dir):
-                    os.makedirs(attachment_dir)
-                else:
-                    for file_name in os.listdir(attachment_dir):
-                        if fnmatch.fnmatch(file_name, f"*{attachment_hash}"):
-                            file_path = attachment_dir.joinpath(file_name)
-                            print("Using already attached file:", file_name)
-                            reuse_attached_file = True
+            mime_type = content_block.get("mime_type")
 
-                if not reuse_attached_file:
-                    with open(file_path, "wb") as f:
-                        f.write(
-                            base64.b64decode(content_block["base64"].encode("ascii"))
-                        )
+            # Allow re-use of attached files.
+            attachment_hash = md5(base64_data.encode("ascii")).hexdigest()
+            file_path = attachment_dir.joinpath(
+                f"{int(time.time())}-{attachment_hash}"
+            )
 
-                attachment_ref = await get_reference_key(
-                    runtime.store,
-                    runtime.context["user_id"],
-                    str(file_path),
-                )
+            # Create directory or search for already attached file.
+            reuse_attached_file = False
+            if not os.path.exists(attachment_dir):
+                os.makedirs(attachment_dir)
+            else:
+                for file_name in os.listdir(attachment_dir):
+                    if fnmatch.fnmatch(file_name, f"*{attachment_hash}"):
+                        file_path = attachment_dir.joinpath(file_name)
+                        print("Using already attached file:", file_name)
+                        reuse_attached_file = True
 
-                # Transform file content block to text content block.
-                lines = [
-                    f"Attached file #{file_counter}:",
-                    f"  File path reference: {attachment_ref}",
-                    f"  MIME type: {content_block["mime_type"]}",
-                ]
-                content_block["type"] = "text"
-                content_block["text"] = "\n".join(lines)
-                # Unset file content block specific properties.
-                del content_block["base64"]
-                del content_block["mime_type"]
+            if not reuse_attached_file:
+                with open(file_path, "wb") as f:
+                    f.write(base64.b64decode(base64_data.encode("ascii")))
 
-                file_counter += 1
+            attachment_ref = await get_reference_key(
+                runtime.store,
+                config["configurable"]["context"]["user_id"],
+                str(file_path),
+            )
+
+            # Transform attachment content block to text content block.
+            lines = [
+                f"Attached file #{file_counter}:",
+                f"  File path reference: {attachment_ref}",
+                f"  MIME type: {mime_type}",
+            ]
+            # Unset attachment-specific properties before reshaping.
+            for key in ("base64", "data", "source_type", "mime_type", "metadata"):
+                if key in content_block:
+                    del content_block[key]
+            content_block["type"] = "text"
+            content_block["text"] = "\n".join(lines)
+
+            file_counter += 1
 
     messages = [system_message, *state["messages"]]
     tools = get_tools()
