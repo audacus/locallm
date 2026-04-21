@@ -6,15 +6,8 @@ import time
 import uuid
 from hashlib import md5
 from pathlib import Path
-from typing import TypedDict, Annotated, NotRequired
 
 from dotenv import load_dotenv
-from langchain.agents.middleware.todo import (
-    Todo,
-    WRITE_TODOS_SYSTEM_PROMPT,
-    write_todos,
-)
-from langchain.agents.middleware.types import OmitFromInput
 from langchain_core.messages import (
     ToolCall,
     InvalidToolCall,
@@ -22,15 +15,16 @@ from langchain_core.messages import (
     SystemMessage,
 )
 from langchain_core.messages.content import create_text_block
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.constants import END
-from langgraph.graph import StateGraph, MessagesState
+from langgraph.graph import StateGraph
 from langgraph.prebuilt import tools_condition
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 from pydantic import SecretStr
 
-from graph.models import OrchestratorContext
+from graph.models import OrchestratorState, OrchestratorOutputState
 from graph.node.async_tool_node_wrapper import async_tool_node_wrapper
 from graph.node.output_shaper import output_shaper
 from graph.tools import get_tools, get_tool_list
@@ -49,17 +43,10 @@ orchestrator_model = ChatOpenAI(
 )
 
 
-class OrchestratorState(MessagesState):
-    todos: Annotated[NotRequired[list[Todo]], OmitFromInput]
-
-
-class OrchestratorOutputState(TypedDict):
-    output: str
-
-
 async def call_orchestrator(
     state: OrchestratorState,
-    runtime: Runtime[OrchestratorContext],
+    runtime: Runtime,
+    config: RunnableConfig,
 ) -> Command:
     # Build system prompt and prepend to input messages.
     tool_list = get_tool_list()
@@ -137,7 +124,10 @@ async def call_orchestrator(
 
     # Special handling for `xLAM 2`.
     # Try to decode the response as JSON array of tool calls.
-    if "model_name" in response.response_metadata and "xlam-2" in response.response_metadata["model_name"].lower():
+    if (
+        "model_name" in response.response_metadata
+        and "xlam-2" in response.response_metadata["model_name"].lower()
+    ):
         tool_calls: list[ToolCall] = []
         try:
             obj = json.loads(response.text)

@@ -2,13 +2,11 @@ import asyncio
 import mimetypes
 
 from langchain_core.messages import ToolMessage
-from langchain_core.tools import tool, ToolException
-from langgraph.graph import MessagesState
+from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from graph.models import OrchestratorContext
 from store.references import get_reference_value
 
 
@@ -35,7 +33,7 @@ class GetMIMETypeInput(BaseModel):
 )
 async def sleep(
     seconds: int,
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     await asyncio.sleep(seconds)
 
@@ -54,10 +52,12 @@ async def sleep(
 )
 async def read_file(
     file_path_ref: str,
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     file_path = await get_reference_value(
-        runtime.store, runtime.context["user_id"], file_path_ref
+        runtime.store,
+        runtime.config["configurable"]["context"]["user_id"],
+        file_path_ref,
     )
     if file_path is None:
         tool_error_message = ToolMessage(
@@ -86,10 +86,12 @@ async def read_file(
 )
 async def get_mime_type(
     file_path_ref: str,
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     file_path = await get_reference_value(
-        runtime.store, runtime.context["user_id"], file_path_ref
+        runtime.store,
+        runtime.config["configurable"]["context"]["user_id"],
+        file_path_ref,
     )
     if file_path is None:
         tool_error_message = ToolMessage(

@@ -4,12 +4,10 @@ import httpx
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
-from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from graph.models import OrchestratorContext
 from store.references import get_reference_value, get_reference_key
 
 load_dotenv()
@@ -20,50 +18,57 @@ base_url = os.getenv("API_BASE_URL_AUDIO_PLAYBACK")
 # --- Pure HTTP logic (no LangGraph awareness) ---
 
 
-def _play_audio(queue_name: str, file_paths: list[str], volume: float = 1.0) -> dict:
-    response = httpx.post(
-        f"{base_url}/queues/{queue_name}",
-        json={"files": file_paths, "volume": volume},
-    )
+async def _play_audio(queue_name: str, file_paths: list[str], volume: float = 1.0) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{base_url}/queues/{queue_name}",
+            json={"files": file_paths, "volume": volume},
+        )
     response.raise_for_status()
     return response.json()
 
 
-def _list_queues() -> list[dict]:
-    response = httpx.get(f"{base_url}/queues")
+async def _list_queues() -> list[dict]:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{base_url}/queues")
     response.raise_for_status()
     return response.json()
 
 
-def _get_queue_status(queue_name: str) -> dict:
-    response = httpx.get(f"{base_url}/queues/{queue_name}")
+async def _get_queue_status(queue_name: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{base_url}/queues/{queue_name}")
     response.raise_for_status()
     return response.json()
 
 
-def _stop_queue(queue_name: str) -> dict:
-    response = httpx.delete(f"{base_url}/queues/{queue_name}")
+async def _stop_queue(queue_name: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.delete(f"{base_url}/queues/{queue_name}")
     response.raise_for_status()
     return response.json()
 
 
-def _stop_all_queues() -> dict:
-    response = httpx.delete(f"{base_url}/queues")
+async def _stop_all_queues() -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.delete(f"{base_url}/queues")
     response.raise_for_status()
     return response.json()
 
 
-def _set_volume(queue_name: str, volume: float) -> dict:
-    response = httpx.put(
-        f"{base_url}/queues/{queue_name}/volume",
-        json={"volume": volume},
-    )
+async def _set_volume(queue_name: str, volume: float) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            f"{base_url}/queues/{queue_name}/volume",
+            json={"volume": volume},
+        )
     response.raise_for_status()
     return response.json()
 
 
-def _skip_track(queue_name: str) -> dict:
-    response = httpx.post(f"{base_url}/queues/{queue_name}/skip")
+async def _skip_track(queue_name: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{base_url}/queues/{queue_name}/skip")
     response.raise_for_status()
     return response.json()
 
@@ -111,7 +116,7 @@ async def play_audio_queue(
     queue_name: str,
     file_path_refs: list[str],
     volume: float,
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     if len(file_path_refs) == 0:
         tool_error_message = ToolMessage(
@@ -125,7 +130,11 @@ async def play_audio_queue(
     # Resolve reference keys to actual file paths.
     file_paths: list[str] = []
     for ref in file_path_refs:
-        path = await get_reference_value(runtime.store, runtime.context["user_id"], ref)
+        path = await get_reference_value(
+            runtime.store,
+            runtime.config["configurable"]["context"]["user_id"],
+            ref,
+        )
         if path is None:
             tool_message = ToolMessage(
                 content=f"Reference '{ref}' not found.",
@@ -136,7 +145,7 @@ async def play_audio_queue(
             return Command(update={"messages": [tool_message]})
         file_paths.append(path)
 
-    status = _play_audio(queue_name, file_paths, volume)
+    status = await _play_audio(queue_name, file_paths, volume)
 
     message_lines = [f"Playing on queue '{queue_name}':"]
     for ref, path in zip(file_path_refs, file_paths):
@@ -156,10 +165,10 @@ async def play_audio_queue(
     "list_audio_queues",
     description="List all active audio playback queues with their status.",
 )
-def list_audio_queues(
-    runtime: ToolRuntime[None, MessagesState],
+async def list_audio_queues(
+    runtime: ToolRuntime,
 ) -> Command:
-    queues = _list_queues()
+    queues = await _list_queues()
 
     if not queues:
         content = "No active audio queues."
@@ -187,10 +196,10 @@ def list_audio_queues(
 )
 async def get_audio_queue_status(
     queue_name: str,
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     try:
-        status = _get_queue_status(queue_name)
+        status = await _get_queue_status(queue_name)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             tool_error_message = ToolMessage(
@@ -205,7 +214,7 @@ async def get_audio_queue_status(
     playing = "playing" if status["is_playing"] else "idle"
     current_file_ref = await get_reference_key(
         runtime.store,
-        runtime.context["user_id"],
+        runtime.config["configurable"]["context"]["user_id"],
         status["current_file"],
     )
     lines = [
@@ -229,12 +238,12 @@ async def get_audio_queue_status(
     description="Stop audio playback and remove a queue.",
     args_schema=QueueNameInput,
 )
-def stop_audio_queue(
+async def stop_audio_queue(
     queue_name: str,
-    runtime: ToolRuntime[None, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     try:
-        result = _stop_queue(queue_name)
+        result = await _stop_queue(queue_name)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             tool_error_message = ToolMessage(
@@ -258,10 +267,10 @@ def stop_audio_queue(
     "stop_all_audio_queues",
     description="Stop all audio playback and remove all queues.",
 )
-def stop_all_audio_queues(
-    runtime: ToolRuntime[None, MessagesState],
+async def stop_all_audio_queues(
+    runtime: ToolRuntime,
 ) -> Command:
-    result = _stop_all_queues()
+    result = await _stop_all_queues()
 
     tool_message = ToolMessage(
         content=result.get("message", "All audio queues stopped."),
@@ -276,13 +285,13 @@ def stop_all_audio_queues(
     description="Set the volume level for an audio playback queue.",
     args_schema=SetVolumeInput,
 )
-def set_audio_volume(
+async def set_audio_volume(
     queue_name: str,
     volume: float,
-    runtime: ToolRuntime[None, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     try:
-        _set_volume(queue_name, volume)
+        await _set_volume(queue_name, volume)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             tool_error_message = ToolMessage(
@@ -307,12 +316,12 @@ def set_audio_volume(
     description="Skip to the next audio file in a queue.",
     args_schema=QueueNameInput,
 )
-def skip_audio_track(
+async def skip_audio_track(
     queue_name: str,
-    runtime: ToolRuntime[None, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     try:
-        _skip_track(queue_name)
+        await _skip_track(queue_name)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             tool_error_message = ToolMessage(

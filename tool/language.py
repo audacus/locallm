@@ -4,12 +4,9 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
-from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
 from pydantic import BaseModel, Field, SecretStr
-
-from graph.models import OrchestratorContext
 
 load_dotenv()
 
@@ -50,7 +47,7 @@ async def translate_text(
     input_text: str,
     input_language: str | None,
     output_language: str,
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     system_message = SystemMessage(
         content="\n".join(

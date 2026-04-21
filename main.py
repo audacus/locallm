@@ -13,7 +13,6 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import AsyncPostgresStore
 from langgraph.types import Command
 
-from graph.models import OrchestratorContext
 from graph.orchestrator import orchestrator_graph
 
 load_dotenv()
@@ -40,11 +39,11 @@ async def main():
             # Ensure every run has a separate thread ID.
             "configurable": {
                 "thread_id": str(uuid.uuid4()),
+                "context": {
+                    "user_id": "1",
+                },
             },
         }
-
-        # Ensure every run has a separate thread ID.
-        context = OrchestratorContext(user_id="1")
 
         # Write graph diagram to file.
         image_bytes = graph_compiled.get_graph().draw_mermaid_png()
@@ -62,27 +61,29 @@ async def main():
 
         # Simulate user input
         messages = [
-            # HumanMessage(content="""
-            # Play following conversation as audio:
-            # - Hi there. How are you?
-            # - Hey. I'm fine thanks, and you?
-            # - Me too, thanks.
-            # """),
-            HumanMessage(
-                content_blocks=[
-                    create_text_block(
-                        text="""
-- Play the attached file as background music and wait 5 seconds.
-- Play following conversation as audio:
-    - Maria: Hey Johnny. How are you?
-    - Johnny: Hey Maria. I'm fine thanks, and you?
-    - Maria: Me too. thanks.
-- Wait 10 seconds, then stop all audio.
-                        """,
-                    ),
-                    create_file_block(base64=base64_data, mime_type=mime_type),
-                ],
-            ),
+            HumanMessage(content="""
+            Play following conversation as audio:
+            - Hi there. How are you?
+            - Hey. I'm fine thanks, and you?
+            - Me too, thanks.
+            """),
+
+#             HumanMessage(
+#                 content_blocks=[
+#                     create_text_block(
+#                         text="""
+# - Play the attached file as background music and wait 5 seconds.
+# - Play following conversation as audio:
+#     - Maria: Hey Johnny. How are you?
+#     - Johnny: Hey Maria. I'm fine thanks, and you?
+#     - Maria: Me too. thanks.
+# - Wait 10 seconds, then stop all audio.
+#                         """,
+#                     ),
+#                     create_file_block(base64=base64_data, mime_type=mime_type),
+#                 ],
+#             ),
+
             # HumanMessage(content="Stop all music!")
             # HumanMessage(
             #     content_blocks=[
@@ -97,7 +98,6 @@ async def main():
         await graph_compiled.ainvoke(
             input=Command(update={"messages": messages}),
             config=config,
-            context=context,
             subgraphs=True,
         )
 

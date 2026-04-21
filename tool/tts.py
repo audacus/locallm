@@ -9,13 +9,11 @@ from typing import Literal
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
-from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
-from graph.models import OrchestratorContext
 from store.references import get_reference_key
 
 load_dotenv()
@@ -124,7 +122,7 @@ async def generate_speech(
 )
 async def convert_text_to_speech(
     voice_text_parts: list[VoiceTextPart],
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     if len(voice_text_parts) == 0:
         tool_error_message = ToolMessage(
@@ -157,7 +155,7 @@ async def convert_text_to_speech(
 
         reference_key_audio_file_path = await get_reference_key(
             runtime.store,
-            runtime.context["user_id"],
+            runtime.config["configurable"]["context"]["user_id"],
             generation.audio_file_path,
         )
         message_lines.append(

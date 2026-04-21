@@ -7,13 +7,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
-from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
-from graph.models import OrchestratorContext
 from store.references import get_reference_value, get_reference_key
 
 load_dotenv()
@@ -147,7 +145,7 @@ async def transcribe_audio(
 )
 async def call_transcribe_audio(
     file_path_refs: list[str],
-    runtime: ToolRuntime[OrchestratorContext, MessagesState],
+    runtime: ToolRuntime,
 ) -> Command:
     if len(file_path_refs) == 0:
         tool_error_message = ToolMessage(
@@ -162,7 +160,9 @@ async def call_transcribe_audio(
     file_paths: list[str] = []
     for ref in file_path_refs:
         file_path = await get_reference_value(
-            runtime.store, runtime.context["user_id"], ref
+            runtime.store,
+            runtime.config["configurable"]["context"]["user_id"],
+            ref,
         )
         if file_path is None:
             tool_error_message = ToolMessage(
@@ -196,12 +196,12 @@ async def call_transcribe_audio(
 
         reference_key_audio_file_path = await get_reference_key(
             runtime.store,
-            runtime.context["user_id"],
+            runtime.config["configurable"]["context"]["user_id"],
             generation.audio_file_path,
         )
         reference_key_text_file_path = await get_reference_key(
             runtime.store,
-            runtime.context["user_id"],
+            runtime.config["configurable"]["context"]["user_id"],
             generation.text_file_path,
         )
         message_lines.append(
